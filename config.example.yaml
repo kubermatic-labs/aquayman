@@ -1,0 +1,21 @@
+organization: myorganisation
+teams:
+  - name: developers
+    role: creator
+    members:
+      - me
+      - myself
+      - myorganisation+mybot
+
+repositories:
+  - name: '*'
+    teams:
+      developer: write
+
+  - name: special
+    users:
+      somebody: read
+
+robots:
+  - name: mybot
+    description: does various things
