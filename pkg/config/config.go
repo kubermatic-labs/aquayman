@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/kubermatic-labs/quayman/pkg/quay"
 	"github.com/kubermatic-labs/quayman/pkg/util"
