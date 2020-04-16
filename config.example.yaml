@@ -1,21 +1,57 @@
+# The organisation for which this configuration applies;
+# this must always be set.
 organization: myorganisation
+
+# The list of teams in this organisation. Teams not defined
+# here will be deleted during synchronization. Team names
+# must be unique within an organization.
 teams:
   - name: developers
+    # possible roles are member, creator or admin
     role: creator
+    # members are both users and robots; robots must be
+    # specified with their full name, i.e. "[org]+[name]"
     members:
       - me
       - myself
       - myorganisation+mybot
 
+# Repository rules. This is where team and user access to
+# individual repositories is configured. The `name` for
+# each item here is treated as a glob pattern, but during
+# matching an exact match is preferred. If to items match
+# a given repository, the longest match wins.
+# In contrast to teams and robots, there does not need to
+# be a rule for every repository. Repositories that are
+# not matched will be ignored during synchronization.
 repositories:
+    # This is effectively a "fallback" that applies to
+    # all repositories that have no more spcific configurations
+    # (like "myapp").
   - name: '*'
+    # A mapping of team names to their roles in this repository;
+    # possible roles are read, write or admin.
+    # Teams not listed here will be removed from the repository.
     teams:
       developer: write
-
-  - name: special
+    # A mapping of user/robot names to their roles in this
+    # repository; possible roles are read, write or admin.
+    # Robot names must be full names, i.e. "[org]+[name]".
+    # Users not listed here will be removed from the repository.
     users:
       somebody: read
+      myorganisation+mybot: write
 
+  - name: myapp
+    users:
+      somebody: read
+      myorganisation+mybot: write
+
+# The list of robots in this organization. Robots not defined
+# here will be deleted during synchronization. Robot names
+# must be unique within an organization.
 robots:
+    # Robot names must be specified by their short name,
+    # i.e. without the "[org]+" prefix.
   - name: mybot
     description: does various things
