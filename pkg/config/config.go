@@ -10,8 +10,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/kubermatic-labs/quayman/pkg/quay"
-	"github.com/kubermatic-labs/quayman/pkg/util"
+	"github.com/kubermatic-labs/aquayman/pkg/quay"
+	"github.com/kubermatic-labs/aquayman/pkg/util"
 )
 
 type Config struct {

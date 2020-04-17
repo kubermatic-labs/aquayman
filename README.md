@@ -1,6 +1,6 @@
-# Quayman
+# Aquayman
 
-Quayman allows you to declare your teams, robots and repository permissions in a declarative
+Aquayman allows you to declare your teams, robots and repository permissions in a declarative
 way (by virtue of a YAML file), which will then be applies to your Quay.io organization. This
 enables consistent, always up-to-date team members and access rules.
 
@@ -12,7 +12,7 @@ enables consistent, always up-to-date team members and access rules.
 
 ## Installation
 
-We strongly recommend that you use an [official release][3] of Quayman.
+We strongly recommend that you use an [official release][3] of Aquayman.
 
 _The code and sample YAML files in the master branch of are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
@@ -21,12 +21,12 @@ _The code and sample YAML files in the master branch of are under active develop
 This project uses Go 1.14 and Go modules for its dependencies. You can get it via `go get`:
 
 ```bash
-GO111MODULE=on go get github.com/kubermatic-labs/quayman
+GO111MODULE=on go get github.com/kubermatic-labs/aquayman
 ```
 
 ## Mode Of Operation
 
-Whenever Quayman synchronizes an organization, it will perform these steps:
+Whenever Aquayman synchronizes an organization, it will perform these steps:
 
 1. Ensure only the robots defined in the configuration file exist and that their
    description is up-to-date.
@@ -43,33 +43,33 @@ Whenever Quayman synchronizes an organization, it will perform these steps:
 
 You need an OAuth2 token to authenticate against the API. In your organization settings
 on Quay.io, you can create an application and for it you can then generate a token. Export
-it as the environment variable `QUAYMAN_TOKEN`:
+it as the environment variable `AQUAYMAN_TOKEN`:
 
 ```bash
-export QUAYMAN_TOKEN=thisisnotarealtokenbutjustanexample
+export AQUAYMAN_TOKEN=thisisnotarealtokenbutjustanexample
 ```
 
 ### Configuration
 
 Except for the OAuth2 token, all configuration happens in a YAML file. See the annotated
-`config.example.yaml` for more information or let Quayman generate a config for you by
+`config.example.yaml` for more information or let Aquayman generate a config for you by
 exporting your current settings. See the next section for more information on this.
 
 ### Validating
 
 It's possible to only validate a configuration file for syntactic correctness by running
-Quayman with the `-validate` flag:
+Aquayman with the `-validate` flag:
 
 ```bash
-quayman -config myconfig.yaml -validate
+aquayman -config myconfig.yaml -validate
 2020/04/16 23:14:20 ✓ Configuration is valid.
 ```
 
-Quayman exits with code 0 if the config is valid, otherwise with a non-zero code.
+Aquayman exits with code 0 if the config is valid, otherwise with a non-zero code.
 
 ### Exporting
 
-To get started, Quayman can export your existing Quay.io settings into a configuration file.
+To get started, Aquayman can export your existing Quay.io settings into a configuration file.
 For this to work, prepare a fresh configuration file and put your organisation name in it.
 You can skip everything else:
 
@@ -77,10 +77,10 @@ You can skip everything else:
 organization: exampleorg
 ```
 
-Now run Quayman with the `-export` flag:
+Now run Aquayman with the `-export` flag:
 
 ```bash
-quayman -config myconfig.yaml -export
+aquayman -config myconfig.yaml -export
 2020/04/16 23:14:38 ► Exporting organization exampleorg
 2020/04/16 23:14:38 ⇄ Exporting robots…
 2020/04/16 23:14:39   ⚛ mybot
@@ -113,10 +113,10 @@ robots:
 ### Synchronizing
 
 Synchronizing means updating Quay.io to match the given configuration file. It's as simple
-as running Quayman:
+as running Aquayman:
 
 ```bash
-quayman -config myconfig.yaml
+aquayman -config myconfig.yaml
 2020/04/16 23:32:00 ► Updating organization exampleorg…
 2020/04/16 23:32:00 ⇄ Syncing robots…
 2020/04/16 23:32:00   ✎ ⚛ mybot
@@ -128,11 +128,11 @@ quayman -config myconfig.yaml
 2020/04/16 23:32:02 ⚠ Run again with -confirm to apply the changes above.
 ```
 
-Quayman by default only shows a preview of things it would do. Run it with `-confirm` to let
+Aquayman by default only shows a preview of things it would do. Run it with `-confirm` to let
 the magic happen.
 
 ```bash
-quayman -config myconfig.yaml -confirm
+aquayman -config myconfig.yaml -confirm
 2020/04/16 23:32:10 ► Updating organization exampleorg…
 2020/04/16 23:32:10 ⇄ Syncing robots…
 2020/04/16 23:32:10   ✎ ⚛ mybot
@@ -168,10 +168,10 @@ Feedback and discussion are available on [the mailing list][11].
 
 See [the list of releases][3] to find out about feature changes.
 
-[1]: https://github.com/kubermatic-labs/quayman/issues
-[2]: https://github.com/kubermatic-labs/quayman/blob/master/CONTRIBUTING.md
-[3]: https://github.com/kubermatic-labs/quayman/releases
-[4]: https://github.com/kubermatic-labs/quayman/blob/master/CODE_OF_CONDUCT.md
+[1]: https://github.com/kubermatic-labs/aquayman/issues
+[2]: https://github.com/kubermatic-labs/aquayman/blob/master/CONTRIBUTING.md
+[3]: https://github.com/kubermatic-labs/aquayman/releases
+[4]: https://github.com/kubermatic-labs/aquayman/blob/master/CODE_OF_CONDUCT.md
 
 [11]: https://groups.google.com/forum/#!forum/projectXXX
 [12]: https://kubermatic.slack.com/messages/XXX

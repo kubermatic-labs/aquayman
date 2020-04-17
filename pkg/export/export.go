@@ -6,8 +6,8 @@ import (
 	"log"
 	"sort"
 
-	"github.com/kubermatic-labs/quayman/pkg/config"
-	"github.com/kubermatic-labs/quayman/pkg/quay"
+	"github.com/kubermatic-labs/aquayman/pkg/config"
+	"github.com/kubermatic-labs/aquayman/pkg/quay"
 )
 
 func ExportConfiguration(ctx context.Context, organization string, client *quay.Client) (*config.Config, error) {

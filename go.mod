@@ -1,4 +1,4 @@
-module github.com/kubermatic-labs/quayman
+module github.com/kubermatic-labs/aquayman
 
 go 1.14
 

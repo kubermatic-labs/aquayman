@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/kubermatic-labs/quayman/pkg/config"
-	"github.com/kubermatic-labs/quayman/pkg/quay"
-	"github.com/kubermatic-labs/quayman/pkg/util"
+	"github.com/kubermatic-labs/aquayman/pkg/config"
+	"github.com/kubermatic-labs/aquayman/pkg/quay"
+	"github.com/kubermatic-labs/aquayman/pkg/util"
 )
 
 func Sync(ctx context.Context, config *config.Config, client *quay.Client) error {

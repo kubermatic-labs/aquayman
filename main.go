@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/kubermatic-labs/quayman/pkg/config"
-	"github.com/kubermatic-labs/quayman/pkg/export"
-	"github.com/kubermatic-labs/quayman/pkg/quay"
-	"github.com/kubermatic-labs/quayman/pkg/sync"
+	"github.com/kubermatic-labs/aquayman/pkg/config"
+	"github.com/kubermatic-labs/aquayman/pkg/export"
+	"github.com/kubermatic-labs/aquayman/pkg/quay"
+	"github.com/kubermatic-labs/aquayman/pkg/sync"
 )
 
 func main() {
@@ -81,7 +81,7 @@ func main() {
 }
 
 func getToken() string {
-	envName := "QUAYMAN_TOKEN"
+	envName := "AQUAYMAN_TOKEN"
 	token := os.Getenv(envName)
 	if token == "" {
 		log.Fatalf("⚠ No OAuth2 token specified in $%s.", envName)
