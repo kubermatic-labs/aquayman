@@ -1,8 +1,8 @@
 # Aquayman
 
-Aquayman allows you to declare your teams, robots and repository permissions in a declarative
-way (by virtue of a YAML file), which will then be applies to your Quay.io organization. This
-enables consistent, always up-to-date team members and access rules.
+Aquayman (**A Quay Man**ager) allows you to declare your teams, robots and repository permissions
+in a declarative way (by virtue of a YAML file), which will then be applies to your Quay.io
+organization. This enables consistent, always up-to-date team members and access rules.
 
 ## Features
 
