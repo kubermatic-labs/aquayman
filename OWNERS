@@ -1,0 +1,19 @@
+# See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
+
+approvers:
+  - kdomanski
+  - kron4eg
+  - moadqassem
+  - moelsayed
+  - xmudrii
+  - xrstf
+  - youssefazrak
+
+reviewers:
+  - kdomanski
+  - kron4eg
+  - moadqassem
+  - moelsayed
+  - xmudrii
+  - xrstf
+  - youssefazrak
