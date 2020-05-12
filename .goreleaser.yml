@@ -1,0 +1,28 @@
+project_name: aquayman
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+
+archives:
+  - id: aquayman
+    format: zip
+    files:
+      - README.md
+      - LICENSE
+      - config.example.yaml
+
+release:
+  prerelease: true
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-snapshot"

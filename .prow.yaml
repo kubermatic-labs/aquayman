@@ -1,2 +1,29 @@
 presubmits: []
-postsubmits: []
+
+postsubmits:
+  - name: post-aquayman-release-tag
+    max_concurrency: 1
+    # run it in the same cluster as prow itself
+    cluster: prow-controlplane-cluster
+    run_always: true
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic-labs/aquayman.git"
+    branches:
+      - ^v\d+\.\d+\.\d+.*
+    spec:
+      containers:
+        - image: goreleaser/goreleaser:v0.132
+          command:
+            - "./hack/ci/release.sh"
+          volumeMounts:
+            - name: oauth
+              mountPath: /etc/github
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+      volumes:
+        - name: oauth
+          secret:
+            secretName: oauth-token
