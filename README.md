@@ -16,7 +16,7 @@ We strongly recommend that you use an [official release][3] of Aquayman.
 
 _The code and sample YAML files in the master branch of are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
-Docker images are available at [quay.io/kubermatic-labs/aquayman][]
+Docker images are available at [quay.io/kubermatic-labs/aquayman][5].
 
 ## Build From Source
 
