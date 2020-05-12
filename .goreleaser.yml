@@ -21,6 +21,13 @@ archives:
 release:
   prerelease: true
 
+dockers:
+  - binaries:
+      - aquayman
+    image_templates:
+      - "quay.io/kubermatic-labs/aquayman:{{ .Tag }}"
+      - "quay.io/kubermatic-labs/aquayman:latest"
+
 checksum:
   name_template: 'checksums.txt'
 
