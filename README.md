@@ -146,7 +146,7 @@ aquayman -config myconfig.yaml -confirm
 
 ## Troubleshooting
 
-If you encounter issues [file an issue][1] or talk to us on the [#XXX channel][12] on the [Kubermatic Slack][15].
+If you encounter issues [file an issue][1] or talk to us on the [#kubermatic-labs channel][12] on the [Kubermatic Slack][15].
 
 ## Contributing
 
@@ -173,7 +173,7 @@ See [the list of releases][3] to find out about feature changes.
 [3]: https://github.com/kubermatic-labs/aquayman/releases
 [4]: https://github.com/kubermatic-labs/aquayman/blob/master/CODE_OF_CONDUCT.md
 
-[11]: https://groups.google.com/forum/#!forum/projectXXX
-[12]: https://kubermatic.slack.com/messages/XXX
-[13]: https://github.com/kubermatic/XXX/blob/master/docs/zenhub.md
+[11]: https://groups.google.com/forum/#!forum/kubermatic-dev
+[12]: https://kubermatic.slack.com/messages/kubermatic-labs
+[13]: https://github.com/kubermatic-labs/aquayman/blob/master/Zenhub.md
 [15]: http://slack.kubermatic.io/
