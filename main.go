@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -13,22 +14,37 @@ import (
 	"github.com/kubermatic-labs/aquayman/pkg/sync"
 )
 
+// These variables are set by goreleaser during build time.
+var (
+	version = "dev"
+	date    = "unknown"
+)
+
 func main() {
 	ctx := context.Background()
 
 	configFile := ""
+	showVersion := false
 	confirm := false
 	validate := false
 	exportMode := false
 
 	flag.StringVar(&configFile, "config", configFile, "path to the config.yaml")
+	flag.BoolVar(&showVersion, "version", showVersion, "show the Aquayman version and exit")
 	flag.BoolVar(&confirm, "confirm", confirm, "must be set to actually perform any changes on quay.io")
 	flag.BoolVar(&validate, "validate", validate, "validate the given configuration and then exit")
 	flag.BoolVar(&exportMode, "export", exportMode, "export quay.io state and update the config file (-config flag)")
 	flag.Parse()
 
+	if showVersion {
+		fmt.Printf("Aquayman %s (built at %s)\n", version, date)
+		return
+	}
+
 	if configFile == "" {
-		log.Fatal("⚠ No configuration (-config) specified.")
+		log.Print("⚠ No configuration (-config) specified.\n\n")
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	cfg, err := config.LoadFromFile(configFile)
