@@ -16,8 +16,6 @@ We strongly recommend that you use an [official release][3] of Aquayman.
 
 _The code and sample YAML files in the master branch of are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
-Docker images are available at [quay.io/kubermatic-labs/aquayman][5].
-
 ## Build From Source
 
 This project uses Go 1.14 and Go modules for its dependencies. You can get it via `go get`:
@@ -174,7 +172,6 @@ See [the list of releases][3] to find out about feature changes.
 [2]: https://github.com/kubermatic-labs/aquayman/blob/master/CONTRIBUTING.md
 [3]: https://github.com/kubermatic-labs/aquayman/releases
 [4]: https://github.com/kubermatic-labs/aquayman/blob/master/CODE_OF_CONDUCT.md
-[5]: https://quay.io/kubermatic-labs/aquayman
 
 [11]: https://groups.google.com/forum/#!forum/kubermatic-dev
 [12]: https://kubermatic.slack.com/messages/kubermatic-labs
