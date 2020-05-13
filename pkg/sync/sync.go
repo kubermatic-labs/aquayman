@@ -29,26 +29,36 @@ func Sync(ctx context.Context, config *config.Config, client *quay.Client) error
 func syncRobots(ctx context.Context, config *config.Config, client *quay.Client) error {
 	log.Println("⇄ Syncing robots…")
 
-	expectedRobots := []string{}
-
-	for _, robot := range config.Robots {
-		log.Printf("  ✎ ⚛ %s", robot.Name)
-
-		// Ensure robot exists and has the correct description.
-		options := quay.UpsertOrganizationRobotOptions{
-			Description: robot.Description,
-		}
-
-		if err := client.UpsertOrganizationRobot(ctx, config.Organization, robot.Name, options); err != nil {
-			return fmt.Errorf("failed to ensure robot: %v", err)
-		}
-
-		expectedRobots = append(expectedRobots, robot.Name)
-	}
-
 	allRobots, err := client.GetOrganizationRobots(ctx, config.Organization, quay.GetOrganizationRobotsOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list existing organization robots: %v", err)
+	}
+
+	existingNames := []string{}
+	for _, robot := range allRobots {
+		existingNames = append(existingNames, robot.ShortName())
+	}
+
+	expectedRobots := []string{}
+
+	for _, robot := range config.Robots {
+		expectedRobots = append(expectedRobots, robot.Name)
+
+		// do nothing to existing robots, the quay.io API does not offer an endpoint
+		// to update a robot's description
+		if util.StringSliceContains(existingNames, robot.Name) {
+			continue
+		}
+
+		log.Printf("  + ⚛ %s", robot.Name)
+
+		options := quay.CreateOrganizationRobotOptions{
+			Description: robot.Description,
+		}
+
+		if err := client.CreateOrganizationRobot(ctx, config.Organization, robot.Name, options); err != nil {
+			return fmt.Errorf("failed to create robot: %v", err)
+		}
 	}
 
 	for _, robot := range allRobots {
@@ -220,7 +230,7 @@ func syncRepositoryTeams(ctx context.Context, config *config.Config, client *qua
 		} else if expectedRole != team.Role {
 			log.Printf("    + ⚑ %s", team.Name)
 
-			if err := client.SetTeamRepositoryPermissions(ctx, fullRepoName, team.Name, team.Role); err != nil {
+			if err := client.SetTeamRepositoryPermissions(ctx, fullRepoName, team.Name, expectedRole); err != nil {
 				return fmt.Errorf("failed to set team permissions: %v", err)
 			}
 		}
@@ -260,7 +270,7 @@ func syncRepositoryUsers(ctx context.Context, config *config.Config, client *qua
 		} else if expectedRole != user.Role {
 			log.Printf("    + ♟ %s", user.Name)
 
-			if err := client.SetUserRepositoryPermissions(ctx, fullRepoName, user.Name, user.Role); err != nil {
+			if err := client.SetUserRepositoryPermissions(ctx, fullRepoName, user.Name, expectedRole); err != nil {
 				return fmt.Errorf("failed to set user permissions: %v", err)
 			}
 		}

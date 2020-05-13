@@ -68,11 +68,11 @@ func (c *Client) GetOrganizationRobots(ctx context.Context, org string, options 
 	return robots, err
 }
 
-type UpsertOrganizationRobotOptions struct {
+type CreateOrganizationRobotOptions struct {
 	Description string `json:"description"`
 }
 
-func (c *Client) UpsertOrganizationRobot(ctx context.Context, org string, shortName string, opt UpsertOrganizationRobotOptions) error {
+func (c *Client) CreateOrganizationRobot(ctx context.Context, org string, shortName string, opt CreateOrganizationRobotOptions) error {
 	path := fmt.Sprintf("/organization/%s/robots/%s", url.PathEscape(org), url.PathEscape(shortName))
 
 	return c.call(ctx, "PUT", path, nil, toBody(opt), nil)
