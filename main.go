@@ -78,10 +78,6 @@ func main() {
 		return
 	}
 
-	if confirm && cfg.Organization == "kubermatic" {
-		panic("nope")
-	}
-
 	log.Printf("► Updating organization %s…", cfg.Organization)
 
 	err = sync.Sync(ctx, cfg, client)
