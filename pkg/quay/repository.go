@@ -7,6 +7,20 @@ import (
 	"sort"
 )
 
+type RepositoryKind string
+
+const (
+	ImageRepository       RepositoryKind = "image"
+	ApplicationRepository RepositoryKind = "application"
+)
+
+type RepositoryVisibility string
+
+const (
+	Public  RepositoryVisibility = "public"
+	Private RepositoryVisibility = "private"
+)
+
 type Repository struct {
 	Kind        string      `json:"kind"`
 	Name        string      `json:"name"`
@@ -61,4 +75,41 @@ func (c *Client) GetRepositories(ctx context.Context, options GetRepositoriesOpt
 	sort.Sort(RepoByName(repositories))
 
 	return repositories, err
+}
+
+type CreateRepositoryOptions struct {
+	Kind        RepositoryKind       `json:"kind"`
+	Namespace   string               `json:"namespace"`
+	Repository  string               `json:"repository"`
+	Visibility  RepositoryVisibility `json:"visibility"`
+	Description string               `json:"description"`
+}
+
+func (c *Client) CreateRepository(ctx context.Context, opt CreateRepositoryOptions) error {
+	return c.call(ctx, "POST", "/repository", nil, toBody(opt), nil)
+}
+
+type UpdateRepositoryOptions struct {
+	Description string `json:"description"`
+}
+
+func (c *Client) UpdateRepository(ctx context.Context, repo string, opt UpdateRepositoryOptions) error {
+	return c.call(ctx, "PUT", fmt.Sprintf("/repository/%s", repo), nil, toBody(opt), nil)
+}
+
+type changeRepositoryVisibilityBody struct {
+	Visibility RepositoryVisibility `json:"visibility"`
+}
+
+func (c *Client) ChangeRepositoryVisibility(ctx context.Context, repo string, visibility RepositoryVisibility) error {
+	url := fmt.Sprintf("/repository/%s/changevisibility", repo)
+	body := toBody(changeRepositoryVisibilityBody{
+		Visibility: visibility,
+	})
+
+	return c.call(ctx, "POST", url, nil, body, nil)
+}
+
+func (c *Client) DeleteRepository(ctx context.Context, repo string) error {
+	return c.call(ctx, "DELETE", fmt.Sprintf("/repository/%s", repo), nil, nil, nil)
 }

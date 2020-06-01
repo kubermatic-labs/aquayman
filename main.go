@@ -23,17 +23,23 @@ var (
 func main() {
 	ctx := context.Background()
 
-	configFile := ""
-	showVersion := false
-	confirm := false
-	validate := false
-	exportMode := false
+	var (
+		configFile         = ""
+		showVersion        = false
+		confirm            = false
+		validate           = false
+		exportMode         = false
+		createRepositories = false
+		deleteRepositories = false
+	)
 
 	flag.StringVar(&configFile, "config", configFile, "path to the config.yaml")
 	flag.BoolVar(&showVersion, "version", showVersion, "show the Aquayman version and exit")
 	flag.BoolVar(&confirm, "confirm", confirm, "must be set to actually perform any changes on quay.io")
 	flag.BoolVar(&validate, "validate", validate, "validate the given configuration and then exit")
 	flag.BoolVar(&exportMode, "export", exportMode, "export quay.io state and update the config file (-config flag)")
+	flag.BoolVar(&createRepositories, "create-repos", createRepositories, "create repositories listed in the config file but not existing on quay.io yet")
+	flag.BoolVar(&deleteRepositories, "delete-repos", deleteRepositories, "delete repositories on quay.io that are not listed in the config file")
 	flag.Parse()
 
 	if showVersion {
@@ -80,7 +86,12 @@ func main() {
 
 	log.Printf("► Updating organization %s…", cfg.Organization)
 
-	err = sync.Sync(ctx, cfg, client)
+	options := sync.Options{
+		CreateMissingRepositories:  createRepositories,
+		DeleteDanglingRepositories: deleteRepositories,
+	}
+
+	err = sync.Sync(ctx, cfg, client, options)
 	if err != nil {
 		log.Fatalf("⚠ Failed to sync state: %v.", err)
 	}

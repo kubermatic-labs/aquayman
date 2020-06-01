@@ -10,7 +10,16 @@ import (
 	"github.com/kubermatic-labs/aquayman/pkg/util"
 )
 
-func Sync(ctx context.Context, config *config.Config, client *quay.Client) error {
+type Options struct {
+	CreateMissingRepositories  bool
+	DeleteDanglingRepositories bool
+}
+
+func DefaultOptions() Options {
+	return Options{}
+}
+
+func Sync(ctx context.Context, config *config.Config, client *quay.Client, options Options) error {
 	if err := syncRobots(ctx, config, client); err != nil {
 		return fmt.Errorf("failed to sync robots: %v", err)
 	}
@@ -19,7 +28,7 @@ func Sync(ctx context.Context, config *config.Config, client *quay.Client) error
 		return fmt.Errorf("failed to sync teams: %v", err)
 	}
 
-	if err := syncRepositories(ctx, config, client); err != nil {
+	if err := syncRepositories(ctx, config, client, options); err != nil {
 		return fmt.Errorf("failed to sync repositories: %v", err)
 	}
 
@@ -125,9 +134,9 @@ func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Cl
 	)
 
 	if !client.Dry {
-		yesPlase := true
+		yesPlease := true
 		getTeamOptions := quay.GetTeamMembersOptions{
-			IncludePending: &yesPlase,
+			IncludePending: &yesPlease,
 		}
 
 		currentMembers, err = client.GetTeamMembers(ctx, config.Organization, team.Name, getTeamOptions)
@@ -163,53 +172,116 @@ func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Cl
 	return nil
 }
 
-func syncRepositories(ctx context.Context, config *config.Config, client *quay.Client) error {
+func syncRepositories(ctx context.Context, config *config.Config, client *quay.Client, options Options) error {
 	log.Println("⇄ Syncing repositories…")
 
-	options := quay.GetRepositoriesOptions{
+	requestOptions := quay.GetRepositoriesOptions{
 		Namespace: config.Organization,
 	}
 
-	repositories, err := client.GetRepositories(ctx, options)
+	currentRepos, err := client.GetRepositories(ctx, requestOptions)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve repositories: %v", err)
 	}
 
-	for _, repo := range repositories {
-		if err := syncRepository(ctx, config, client, repo); err != nil {
+	// update/delete existing repos
+	currentRepoNames := []string{}
+	for _, repo := range currentRepos {
+		repoConfig := config.GetRepositoryConfig(repo.Name)
+		if repoConfig == nil {
+			if options.DeleteDanglingRepositories {
+				log.Printf("  - ⚒ %s", repo.Name)
+				if err := client.DeleteRepository(ctx, repo.FullName()); err != nil {
+					return err
+				}
+			}
+
+			continue
+		}
+
+		log.Printf("  ✎ ⚒ %s", repo.Name)
+		if err := syncRepository(ctx, client, repo, repoConfig); err != nil {
 			return err
+		}
+
+		currentRepoNames = append(currentRepoNames, repo.Name)
+	}
+
+	// create missing repos on quay.io
+	if options.CreateMissingRepositories {
+		for _, repoConfig := range config.Repositories {
+			// ignore wildcard rules
+			if repoConfig.IsWildcard() {
+				continue
+			}
+
+			if !util.StringSliceContains(currentRepoNames, repoConfig.Name) {
+				log.Printf("  + ⚒ %s", repoConfig.Name)
+
+				options := quay.CreateRepositoryOptions{
+					Namespace:   config.Organization,
+					Repository:  repoConfig.Name,
+					Description: repoConfig.Description,
+					Visibility:  repoConfig.Visibility,
+				}
+
+				if err := client.CreateRepository(ctx, options); err != nil {
+					return err
+				}
+
+				// doing it like this instead of GETing the repo after creation makes it
+				// safe for running in dry mode
+				repo := quay.Repository{
+					Namespace:   config.Organization,
+					Name:        repoConfig.Name,
+					IsPublic:    repoConfig.Visibility == quay.Public,
+					Description: repoConfig.Description,
+				}
+
+				if err := syncRepository(ctx, client, repo, &repoConfig); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
 	return nil
 }
 
-func syncRepository(ctx context.Context, config *config.Config, client *quay.Client, repo quay.Repository) error {
-	// ignore repos for which we have no matching rule set
-	repoConfig := config.GetRepositoryConfig(repo.Name)
-	if repoConfig == nil {
-		return nil
+func syncRepository(ctx context.Context, client *quay.Client, repo quay.Repository, repoConfig *config.RepositoryConfig) error {
+	// ensure repos are not public if they are configured to be private (phrase it like this
+	// just in case quay ever introduces a third visibility state)
+	if repo.IsPublic && repoConfig.Visibility != quay.Public {
+		log.Printf("    - set visibility to %s", repoConfig.Visibility)
+		if err := client.ChangeRepositoryVisibility(ctx, repo.FullName(), repoConfig.Visibility); err != nil {
+			return fmt.Errorf("failed to set visibility: %v", err)
+		}
 	}
 
-	visibility := ""
-	if !repo.IsPublic {
-		visibility = " (private)"
+	if repo.Description != repoConfig.Description {
+		options := quay.UpdateRepositoryOptions{
+			Description: repoConfig.Description,
+		}
+
+		if err := client.UpdateRepository(ctx, repo.FullName(), options); err != nil {
+			return fmt.Errorf("failed to update description: %v", err)
+		}
 	}
 
-	log.Printf("  ⚒ %s%s", repo.Name, visibility)
-
-	if err := syncRepositoryTeams(ctx, config, client, repo.FullName(), repoConfig); err != nil {
-		return err
+	if err := syncRepositoryTeams(ctx, client, repo.FullName(), repoConfig); err != nil {
+		return fmt.Errorf("failed to teams: %v", err)
 	}
 
-	if err := syncRepositoryUsers(ctx, config, client, repo.FullName(), repoConfig); err != nil {
-		return err
+	if err := syncRepositoryUsers(ctx, client, repo.FullName(), repoConfig); err != nil {
+		return fmt.Errorf("failed to users: %v", err)
 	}
 
 	return nil
 }
 
-func syncRepositoryTeams(ctx context.Context, config *config.Config, client *quay.Client, fullRepoName string, repo *config.RepositoryConfig) error {
+func syncRepositoryTeams(ctx context.Context, client *quay.Client, fullRepoName string, repo *config.RepositoryConfig) error {
+	// amazingly, this API call does not fail if the repo does not exist, so we can
+	// perform it even in dry mode
 	currentTeams, err := client.GetRepositoryTeamPermissions(ctx, fullRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to get team permissions: %v", err)
@@ -249,7 +321,9 @@ func syncRepositoryTeams(ctx context.Context, config *config.Config, client *qua
 	return nil
 }
 
-func syncRepositoryUsers(ctx context.Context, config *config.Config, client *quay.Client, fullRepoName string, repo *config.RepositoryConfig) error {
+func syncRepositoryUsers(ctx context.Context, client *quay.Client, fullRepoName string, repo *config.RepositoryConfig) error {
+	// amazingly, this API call does not fail if the repo does not exist, so we can
+	// perform it even in dry mode
 	currentUsers, err := client.GetRepositoryUserPermissions(ctx, fullRepoName)
 	if err != nil {
 		return fmt.Errorf("failed to get user permissions: %v", err)

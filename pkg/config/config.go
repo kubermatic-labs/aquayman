@@ -29,9 +29,15 @@ type TeamConfig struct {
 }
 
 type RepositoryConfig struct {
-	Name  string                         `yaml:"name"`
-	Teams map[string]quay.RepositoryRole `yaml:"teams,omitempty"`
-	Users map[string]quay.RepositoryRole `yaml:"users,omitempty"`
+	Name        string                         `yaml:"name"`
+	Visibility  quay.RepositoryVisibility      `yaml:"visibility"`
+	Description string                         `yaml:"description,omitempty"`
+	Teams       map[string]quay.RepositoryRole `yaml:"teams,omitempty"`
+	Users       map[string]quay.RepositoryRole `yaml:"users,omitempty"`
+}
+
+func (c *RepositoryConfig) IsWildcard() bool {
+	return strings.Contains(c.Name, "*")
 }
 
 type RobotConfig struct {
@@ -116,10 +122,18 @@ func (c *Config) Validate() error {
 	}
 
 	repoNames := []string{}
+	visibilities := []string{
+		string(quay.Public),
+		string(quay.Private),
+	}
 
 	for _, repo := range c.Repositories {
 		if util.StringSliceContains(repoNames, repo.Name) {
 			return fmt.Errorf("duplicate repository %q defined", repo.Name)
+		}
+
+		if !util.StringSliceContains(visibilities, string(repo.Visibility)) {
+			return fmt.Errorf("invalid visibility %q for repository %q, must be one of %v", repo.Visibility, repo.Name, visibilities)
 		}
 
 		for teamName, roleName := range repo.Teams {
@@ -173,7 +187,7 @@ func (c *Config) GetRepositoryConfig(repo string) *RepositoryConfig {
 	var result RepositoryConfig
 
 	for idx, r := range c.Repositories {
-		if !strings.Contains(r.Name, "*") || len(r.Name) < longestMatch {
+		if !r.IsWildcard() || len(r.Name) < longestMatch {
 			continue
 		}
 

@@ -36,8 +36,12 @@ Whenever Aquayman synchronizes an organization, it will perform these steps:
 
    1. Find a matching repository configuration, based on the name. This can be
       either an exact match, or a glob expression match.
-   2. If no configuration is found, ignore the repository.
+   2. If no configuration is found, delete the repository if Aquayman runs with
+      `-delete-repos`. Otherwise leave the repository alone.
    3. Otherwise, adjust the assigned teams and individual users/robots.
+
+4. If running with `-create-repos`, list all configured repositories from the YAML
+   file. Create and initialize all not yet existing repositories.
 
 ## Usage
 
@@ -143,6 +147,11 @@ aquayman -config myconfig.yaml -confirm
 2020/04/16 23:32:11 ⇄ Syncing repositories…
 2020/04/16 23:32:12 ✓ Permissions successfully synchronized.
 ```
+
+Note that repositories by default can freely exist without being configured in Aquayman.
+This is meant as a safe default, so introducing Aquayman in an existing organiztion is
+easier. To fully synchronize (delete dangling and create missing) repositories, run
+Aquayman with `-create-repos` and `-delete-repos`.
 
 ## Troubleshooting
 

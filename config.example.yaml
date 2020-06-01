@@ -21,14 +21,23 @@ teams:
 # each item here is treated as a glob pattern, but during
 # matching an exact match is preferred. If to items match
 # a given repository, the longest match wins.
-# In contrast to teams and robots, there does not need to
-# be a rule for every repository. Repositories that are
-# not matched will be ignored during synchronization.
+# By default, repositories on quay.io can exist without
+# being mentioned here. If Aquayman runs with -create-repos,
+# it will also create every missing repo (unless it's a
+# wildcard repository, i.e. contains "*"). When running with
+# -delete-repos, repositories not on this list are deleted
+# on quay.io. Running with both flags effetively gives you
+# a full sync.
 repositories:
     # This is effectively a "fallback" that applies to
     # all repositories that have no more spcific configurations
     # (like "myapp").
   - name: '*'
+    # The repository's visibility, one of public or private;
+    # this must be configured.
+    visibility: public
+    # The repository's optional description.
+    description: 'The best repository ever!'
     # A mapping of team names to their roles in this repository;
     # possible roles are read, write or admin.
     # Teams not listed here will be removed from the repository.

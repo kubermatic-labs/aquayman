@@ -59,12 +59,12 @@ func exportRepositories(ctx context.Context, client *quay.Client, cfg *config.Co
 	}
 
 	for _, repo := range repos {
-		visibility := ""
+		visibilitySuffix := ""
 		if !repo.IsPublic {
-			visibility = " (private)"
+			visibilitySuffix = " (private)"
 		}
 
-		log.Printf("  ⚒ %s%s", repo.Name, visibility)
+		log.Printf("  ⚒ %s%s", repo.Name, visibilitySuffix)
 
 		teamPermissions, err := client.GetRepositoryTeamPermissions(ctx, repo.FullName())
 		if err != nil {
@@ -88,10 +88,17 @@ func exportRepositories(ctx context.Context, client *quay.Client, cfg *config.Co
 			users[user.Name] = user.Role
 		}
 
+		visibility := quay.Private
+		if repo.IsPublic {
+			visibility = quay.Public
+		}
+
 		cfg.Repositories = append(cfg.Repositories, config.RepositoryConfig{
-			Name:  repo.Name,
-			Teams: teams,
-			Users: users,
+			Name:        repo.Name,
+			Description: repo.Description,
+			Visibility:  visibility,
+			Teams:       teams,
+			Users:       users,
 		})
 	}
 
