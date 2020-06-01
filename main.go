@@ -58,6 +58,14 @@ func main() {
 		log.Fatalf("⚠ Failed to load config %q: %v.", configFile, err)
 	}
 
+	// validate config unless in export mode, where an incomplete
+	// configuration is allowed and even expected
+	if !exportMode {
+		if err := cfg.Validate(); err != nil {
+			log.Fatalf("Configuration is invalid: %v", err)
+		}
+	}
+
 	if validate {
 		log.Println("✓ Configuration is valid.")
 		return

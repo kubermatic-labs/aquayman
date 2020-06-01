@@ -61,10 +61,6 @@ func LoadFromFile(filename string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
 	return config, nil
 }
 
