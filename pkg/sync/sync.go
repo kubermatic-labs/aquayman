@@ -249,9 +249,7 @@ func syncRepositories(ctx context.Context, config *config.Config, client *quay.C
 }
 
 func syncRepository(ctx context.Context, client *quay.Client, repo quay.Repository, repoConfig *config.RepositoryConfig) error {
-	// ensure repos are not public if they are configured to be private (phrase it like this
-	// just in case quay ever introduces a third visibility state)
-	if repo.IsPublic && repoConfig.Visibility != quay.Public {
+	if repo.Visibility() != repoConfig.Visibility {
 		log.Printf("    - set visibility to %s", repoConfig.Visibility)
 		if err := client.ChangeRepositoryVisibility(ctx, repo.FullName(), repoConfig.Visibility); err != nil {
 			return fmt.Errorf("failed to set visibility: %v", err)

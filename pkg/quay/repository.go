@@ -35,6 +35,14 @@ func (r *Repository) FullName() string {
 	return r.Namespace + "/" + r.Name
 }
 
+func (r *Repository) Visibility() RepositoryVisibility {
+	if r.IsPublic {
+		return Public
+	}
+
+	return Private
+}
+
 type getRepositoriesReponse struct {
 	Repositories []Repository `json:"repositories"`
 }
