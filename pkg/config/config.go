@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -98,7 +99,7 @@ func validRepositoryRole(role quay.RepositoryRole) bool {
 	return false
 }
 
-func (c *Config) Validate() error {
+func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 	if c.Organization == "" {
 		return errors.New("no organization configured")
 	}
@@ -115,6 +116,36 @@ func (c *Config) Validate() error {
 		}
 
 		teamNames = append(teamNames, team.Name)
+
+		if client != nil {
+			for _, member := range team.Members {
+				if _, err := client.GetUser(ctx, member); err != nil {
+					return fmt.Errorf("user %q in team %q does not exist: %v", member, team.Name, err)
+				}
+			}
+		}
+	}
+
+	robotNames := []string{}
+	robotPattern := regexp.MustCompile(`^[a-z][a-z0-9_]{1,254}$`)
+	prefix := c.Organization + "+"
+
+	for _, robot := range c.Robots {
+		fullName := fmt.Sprintf("%s+%s", c.Organization, robot.Name)
+
+		if util.StringSliceContains(robotNames, fullName) {
+			return fmt.Errorf("duplicate robot %q defined", robot.Name)
+		}
+
+		if strings.HasPrefix(robot.Name, prefix) {
+			return fmt.Errorf("robot %q must be given as a short name, without the organization prefix (must be \"%s\")", robot.Name, strings.TrimPrefix(robot.Name, prefix))
+		}
+
+		if !robotPattern.MatchString(robot.Name) {
+			return fmt.Errorf("robot %q has an invalid name, must be alphanumeric lowercase", robot.Name)
+		}
+
+		robotNames = append(robotNames, fullName)
 	}
 
 	repoNames := []string{}
@@ -133,6 +164,10 @@ func (c *Config) Validate() error {
 		}
 
 		for teamName, roleName := range repo.Teams {
+			if !util.StringSliceContains(teamNames, teamName) {
+				return fmt.Errorf("invalid team %q assigned to repo %q: team does not exist", teamName, repo.Name)
+			}
+
 			if !validRepositoryRole(roleName) {
 				return fmt.Errorf("role for team %s in repo %q is invalid (%q), must be one of %v", teamName, repo.Name, roleName, quay.AllRepositoryRoles)
 			}
@@ -142,29 +177,19 @@ func (c *Config) Validate() error {
 			if !validRepositoryRole(roleName) {
 				return fmt.Errorf("role for user %s in repo %q is invalid (%q), must be one of %v", userName, repo.Name, roleName, quay.AllRepositoryRoles)
 			}
+
+			if quay.IsRobotUsername(userName) {
+				if !util.StringSliceContains(robotNames, userName) {
+					return fmt.Errorf("invalid robot %q assigned to repo %q: robot does not exist", userName, repo.Name)
+				}
+			} else if client != nil {
+				if _, err := client.GetUser(ctx, userName); err != nil {
+					return fmt.Errorf("invalid user %q assigned to repo %q: user does not exist", userName, repo.Name)
+				}
+			}
 		}
 
 		repoNames = append(repoNames, repo.Name)
-	}
-
-	robotNames := []string{}
-	robotPattern := regexp.MustCompile(`^[a-z][a-z0-9_]{1,254}$`)
-	prefix := c.Organization + "+"
-
-	for _, robot := range c.Robots {
-		if util.StringSliceContains(robotNames, robot.Name) {
-			return fmt.Errorf("duplicate robot %q defined", robot.Name)
-		}
-
-		if strings.HasPrefix(robot.Name, prefix) {
-			return fmt.Errorf("robot %q must be given as a short name, without the organization prefix (must be \"%s\")", robot.Name, strings.TrimPrefix(robot.Name, prefix))
-		}
-
-		if !robotPattern.MatchString(robot.Name) {
-			return fmt.Errorf("robot %q has an invalid name, must be alphanumeric lowercase", robot.Name)
-		}
-
-		robotNames = append(robotNames, robot.Name)
 	}
 
 	return nil

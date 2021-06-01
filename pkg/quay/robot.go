@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+func IsRobotUsername(name string) bool {
+	return strings.Contains(name, "+")
+}
+
 type Robot struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

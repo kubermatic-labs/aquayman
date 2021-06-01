@@ -28,6 +28,7 @@ func main() {
 		showVersion        = false
 		confirm            = false
 		validate           = false
+		checkNames         = false
 		exportMode         = false
 		createRepositories = false
 		deleteRepositories = false
@@ -36,7 +37,8 @@ func main() {
 	flag.StringVar(&configFile, "config", configFile, "path to the config.yaml")
 	flag.BoolVar(&showVersion, "version", showVersion, "show the Aquayman version and exit")
 	flag.BoolVar(&confirm, "confirm", confirm, "must be set to actually perform any changes on quay.io")
-	flag.BoolVar(&validate, "validate", validate, "validate the given configuration and then exit")
+	flag.BoolVar(&validate, "validate", validate, "validate the given configuration syntax and then exit")
+	flag.BoolVar(&checkNames, "check-names", checkNames, "(only with -validate) validate that users actually exist (requires valid quay.io credentials)")
 	flag.BoolVar(&exportMode, "export", exportMode, "export quay.io state and update the config file (-config flag)")
 	flag.BoolVar(&createRepositories, "create-repos", createRepositories, "create repositories listed in the config file but not existing on quay.io yet")
 	flag.BoolVar(&deleteRepositories, "delete-repos", deleteRepositories, "delete repositories on quay.io that are not listed in the config file")
@@ -58,10 +60,21 @@ func main() {
 		log.Fatalf("⚠ Failed to load config %q: %v.", configFile, err)
 	}
 
+	var (
+		client *quay.Client
+	)
+
 	// validate config unless in export mode, where an incomplete
 	// configuration is allowed and even expected
 	if !exportMode {
-		if err := cfg.Validate(); err != nil {
+		if checkNames {
+			client, err = quay.NewClient(getToken(), 30*time.Second, true)
+			if err != nil {
+				log.Fatalf("⚠ Failed to create quay.io API client: %v.", err)
+			}
+		}
+
+		if err := cfg.Validate(ctx, client); err != nil {
 			log.Fatalf("Configuration is invalid: %v", err)
 		}
 	}
@@ -71,9 +84,11 @@ func main() {
 		return
 	}
 
-	client, err := quay.NewClient(getToken(), 30*time.Second, !confirm)
-	if err != nil {
-		log.Fatalf("⚠ Failed to create quay.io API client: %v.", err)
+	if client == nil {
+		client, err = quay.NewClient(getToken(), 30*time.Second, !confirm)
+		if err != nil {
+			log.Fatalf("⚠ Failed to create quay.io API client: %v.", err)
+		}
 	}
 
 	if exportMode {
