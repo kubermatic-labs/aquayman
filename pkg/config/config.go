@@ -99,32 +99,28 @@ func validRepositoryRole(role quay.RepositoryRole) bool {
 	return false
 }
 
+func validateUsername(ctx context.Context, client *quay.Client, name string, cache map[string]struct{}) error {
+	if _, ok := cache[name]; ok {
+		return nil
+	}
+
+	_, err := client.GetUser(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	cache[name] = struct{}{}
+
+	return nil
+}
+
 func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 	if c.Organization == "" {
 		return errors.New("no organization configured")
 	}
 
-	teamNames := []string{}
-
-	for _, team := range c.Teams {
-		if util.StringSliceContains(teamNames, team.Name) {
-			return fmt.Errorf("duplicate team %q defined", team.Name)
-		}
-
-		if !validTeamRole(team.Role) {
-			return fmt.Errorf("role for team %q is invalid (%q), must be one of %v", team.Name, team.Role, quay.AllTeamRoles)
-		}
-
-		teamNames = append(teamNames, team.Name)
-
-		if client != nil {
-			for _, member := range team.Members {
-				if _, err := client.GetUser(ctx, member); err != nil {
-					return fmt.Errorf("user %q in team %q does not exist: %v", member, team.Name, err)
-				}
-			}
-		}
-	}
+	// runtime cache
+	existingUsers := map[string]struct{}{}
 
 	robotNames := []string{}
 	robotPattern := regexp.MustCompile(`^[a-z][a-z0-9_]{1,254}$`)
@@ -146,6 +142,32 @@ func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 		}
 
 		robotNames = append(robotNames, fullName)
+	}
+
+	teamNames := []string{}
+
+	for _, team := range c.Teams {
+		if util.StringSliceContains(teamNames, team.Name) {
+			return fmt.Errorf("duplicate team %q defined", team.Name)
+		}
+
+		if !validTeamRole(team.Role) {
+			return fmt.Errorf("role for team %q is invalid (%q), must be one of %v", team.Name, team.Role, quay.AllTeamRoles)
+		}
+
+		teamNames = append(teamNames, team.Name)
+
+		if client != nil {
+			for _, member := range team.Members {
+				if quay.IsRobotUsername(member) {
+					if !util.StringSliceContains(robotNames, member) {
+						return fmt.Errorf("robot %q in team %q does not exist", member, team.Name)
+					}
+				} else if err := validateUsername(ctx, client, member, existingUsers); err != nil {
+					return fmt.Errorf("user %q in team %q does not exist: %v", member, team.Name, err)
+				}
+			}
+		}
 	}
 
 	repoNames := []string{}
