@@ -99,14 +99,26 @@ func validRepositoryRole(role quay.RepositoryRole) bool {
 	return false
 }
 
+var (
+	userRegexp  = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]*$`)
+	teamRegexp  = regexp.MustCompile(`^[a-z][a-z0-9]+$`)
+	repoRegexp  = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]*$`)
+	robotRegexp = regexp.MustCompile(`^[a-z][a-z0-9_]{1,254}$`)
+	orgRegexp   = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]{1,254}$`)
+)
+
 func validateUsername(ctx context.Context, client *quay.Client, name string, cache map[string]struct{}) error {
+	if !userRegexp.MatchString(name) {
+		return fmt.Errorf("username is invalid, must be %v", userRegexp)
+	}
+
 	if _, ok := cache[name]; ok {
 		return nil
 	}
 
 	_, err := client.GetUser(ctx, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch user: %w", err)
 	}
 
 	cache[name] = struct{}{}
@@ -119,11 +131,14 @@ func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 		return errors.New("no organization configured")
 	}
 
+	if !orgRegexp.MatchString(c.Organization) {
+		return fmt.Errorf("organization name %q is invalid, must be %v", c.Organization, orgRegexp)
+	}
+
 	// runtime cache
 	existingUsers := map[string]struct{}{}
 
 	robotNames := []string{}
-	robotPattern := regexp.MustCompile(`^[a-z][a-z0-9_]{1,254}$`)
 	prefix := c.Organization + "+"
 
 	for _, robot := range c.Robots {
@@ -137,8 +152,8 @@ func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 			return fmt.Errorf("robot %q must be given as a short name, without the organization prefix (must be \"%s\")", robot.Name, strings.TrimPrefix(robot.Name, prefix))
 		}
 
-		if !robotPattern.MatchString(robot.Name) {
-			return fmt.Errorf("robot %q has an invalid name, must be alphanumeric lowercase", robot.Name)
+		if !robotRegexp.MatchString(robot.Name) {
+			return fmt.Errorf("robot name %q is invalid, must be %v", robot.Name, robotRegexp)
 		}
 
 		robotNames = append(robotNames, fullName)
@@ -155,6 +170,10 @@ func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 			return fmt.Errorf("role for team %q is invalid (%q), must be one of %v", team.Name, team.Role, quay.AllTeamRoles)
 		}
 
+		if !teamRegexp.MatchString(team.Name) {
+			return fmt.Errorf("team name %q is invalid, must be %v", team.Name, teamRegexp)
+		}
+
 		teamNames = append(teamNames, team.Name)
 
 		if client != nil {
@@ -164,7 +183,7 @@ func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 						return fmt.Errorf("robot %q in team %q does not exist", member, team.Name)
 					}
 				} else if err := validateUsername(ctx, client, member, existingUsers); err != nil {
-					return fmt.Errorf("user %q in team %q does not exist: %v", member, team.Name, err)
+					return fmt.Errorf("user %q in team %q is invalid: %v", member, team.Name, err)
 				}
 			}
 		}
@@ -183,6 +202,10 @@ func (c *Config) Validate(ctx context.Context, client *quay.Client) error {
 
 		if !util.StringSliceContains(visibilities, string(repo.Visibility)) {
 			return fmt.Errorf("invalid visibility %q for repository %q, must be one of %v", repo.Visibility, repo.Name, visibilities)
+		}
+
+		if !repoRegexp.MatchString(repo.Name) {
+			return fmt.Errorf("repository name %q is invalid, must be %v", repo.Name, repoRegexp)
 		}
 
 		for teamName, roleName := range repo.Teams {
