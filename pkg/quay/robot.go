@@ -72,6 +72,14 @@ func (c *Client) GetOrganizationRobots(ctx context.Context, org string, options 
 	return robots, err
 }
 
+func (c *Client) GetOrganizationRobot(ctx context.Context, org string, shortName string) (*Robot, error) {
+	response := Robot{}
+	path := fmt.Sprintf("/organization/%s/robots/%s", url.PathEscape(org), url.PathEscape(shortName))
+	err := c.call(ctx, "GET", path, nil, nil, &response)
+
+	return &response, err
+}
+
 type CreateOrganizationRobotOptions struct {
 	Description string `json:"description"`
 }

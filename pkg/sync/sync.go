@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/kubermatic-labs/aquayman/pkg/config"
+	"github.com/kubermatic-labs/aquayman/pkg/publisher"
 	"github.com/kubermatic-labs/aquayman/pkg/quay"
 	"github.com/kubermatic-labs/aquayman/pkg/util"
 )
@@ -13,32 +14,37 @@ import (
 type Options struct {
 	CreateMissingRepositories  bool
 	DeleteDanglingRepositories bool
+	Publisher                  publisher.Publisher
 }
 
 func DefaultOptions() Options {
 	return Options{}
 }
 
-func Sync(ctx context.Context, config *config.Config, client *quay.Client, options Options) error {
-	if err := syncRobots(ctx, config, client); err != nil {
+func Sync(ctx context.Context, cfg *config.Config, client *quay.Client, options Options) error {
+	if err := syncRobots(ctx, cfg, client, options); err != nil {
 		return fmt.Errorf("failed to sync robots: %v", err)
 	}
 
-	if err := syncTeams(ctx, config, client); err != nil {
+	if err := syncTeams(ctx, cfg, client); err != nil {
 		return fmt.Errorf("failed to sync teams: %v", err)
 	}
 
-	if err := syncRepositories(ctx, config, client, options); err != nil {
+	if err := syncRepositories(ctx, cfg, client, options); err != nil {
 		return fmt.Errorf("failed to sync repositories: %v", err)
 	}
 
 	return nil
 }
 
-func syncRobots(ctx context.Context, config *config.Config, client *quay.Client) error {
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func syncRobots(ctx context.Context, cfg *config.Config, client *quay.Client, options Options) error {
 	log.Println("⇄ Syncing robots…")
 
-	allRobots, err := client.GetOrganizationRobots(ctx, config.Organization, quay.GetOrganizationRobotsOptions{})
+	allRobots, err := client.GetOrganizationRobots(ctx, cfg.Organization, quay.GetOrganizationRobotsOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list existing organization robots: %v", err)
 	}
@@ -50,7 +56,14 @@ func syncRobots(ctx context.Context, config *config.Config, client *quay.Client)
 
 	expectedRobots := []string{}
 
-	for _, robot := range config.Robots {
+	// create missing robots
+	for _, robot := range cfg.Robots {
+		// do not create robots that are marked for deletion (this flag is mainly
+		// a workaround for proper cleanup in Vault)
+		if robot.Deleted {
+			continue
+		}
+
 		expectedRobots = append(expectedRobots, robot.Name)
 
 		// do nothing to existing robots, the quay.io API does not offer an endpoint
@@ -61,23 +74,86 @@ func syncRobots(ctx context.Context, config *config.Config, client *quay.Client)
 
 		log.Printf("  + ⚛ %s", robot.Name)
 
-		options := quay.CreateOrganizationRobotOptions{
+		createOpts := quay.CreateOrganizationRobotOptions{
 			Description: robot.Description,
 		}
 
-		if err := client.CreateOrganizationRobot(ctx, config.Organization, robot.Name, options); err != nil {
+		// create robot on quay
+		if err := client.CreateOrganizationRobot(ctx, cfg.Organization, robot.Name, createOpts); err != nil {
 			return fmt.Errorf("failed to create robot: %v", err)
 		}
 	}
 
+	// remove overhanging robots
 	for _, robot := range allRobots {
 		shortName := robot.ShortName()
 
 		if !util.StringSliceContains(expectedRobots, shortName) {
 			log.Printf("  - ⚛ %s", shortName)
 
-			if err := client.DeleteOrganizationRobot(ctx, config.Organization, shortName); err != nil {
+			if err := client.DeleteOrganizationRobot(ctx, cfg.Organization, shortName); err != nil {
 				return fmt.Errorf("failed to delete robot: %v", err)
+			}
+
+			// find the robot config
+			var robotConfig *config.RobotConfig
+
+			for i, rc := range cfg.Robots {
+				if rc.Name == shortName {
+					robotConfig = &cfg.Robots[i]
+					break
+				}
+			}
+
+			if options.Publisher != nil && robotConfig != nil {
+				if err := options.Publisher.DeleteRobot(ctx, robotConfig); err != nil {
+					return fmt.Errorf("failed to delete robot: %v", err)
+				}
+			}
+		}
+	}
+
+	// Now that all robots have been created, we can sync their tokens to the publisher;
+	// this has the advantage of doing it for _all_ robots, not just those that were
+	// freshly created (i.e. putting a new VaultSecret path into the config will take
+	// effect without having to delete and recreate the robot); the disadvantage is that
+	// we check and update all robots in Vault all the time.
+	if options.Publisher != nil {
+		log.Println("⇄ Publishing robot tokens…")
+
+		if err := publishRobots(ctx, cfg, client, options.Publisher); err != nil {
+			return fmt.Errorf("failed to publish robots: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func publishRobots(ctx context.Context, cfg *config.Config, client *quay.Client, pub publisher.Publisher) error {
+	// list all robots that exist on quay.io
+	allRobots, err := client.GetOrganizationRobots(ctx, cfg.Organization, quay.GetOrganizationRobotsOptions{
+		Token: boolPtr(true),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list existing organization robots: %w", err)
+	}
+
+	for _, robot := range allRobots {
+		shortName := robot.ShortName()
+
+		// find the robot config
+		var robotConfig *config.RobotConfig
+
+		for i, rc := range cfg.Robots {
+			if rc.Name == shortName {
+				robotConfig = &cfg.Robots[i]
+				break
+			}
+		}
+
+		if robotConfig != nil {
+			if err := pub.UpdateRobot(ctx, robotConfig, robot.Token); err != nil {
+				return fmt.Errorf("failed to publish robot: %w", err)
 			}
 		}
 	}
@@ -85,12 +161,12 @@ func syncRobots(ctx context.Context, config *config.Config, client *quay.Client)
 	return nil
 }
 
-func syncTeams(ctx context.Context, config *config.Config, client *quay.Client) error {
+func syncTeams(ctx context.Context, cfg *config.Config, client *quay.Client) error {
 	log.Println("⇄ Syncing teams…")
 
 	expectedTeams := []string{}
 
-	for _, team := range config.Teams {
+	for _, team := range cfg.Teams {
 		log.Printf("  ✎ ⚑ %s", team.Name)
 
 		options := quay.UpsertTeamOptions{
@@ -98,18 +174,18 @@ func syncTeams(ctx context.Context, config *config.Config, client *quay.Client) 
 			Description: team.Description,
 		}
 
-		if err := client.UpsertTeam(ctx, config.Organization, team.Name, options); err != nil {
+		if err := client.UpsertTeam(ctx, cfg.Organization, team.Name, options); err != nil {
 			return fmt.Errorf("failed to ensure team: %v", err)
 		}
 
-		if err := syncTeamMembers(ctx, config, client, team); err != nil {
+		if err := syncTeamMembers(ctx, cfg, client, team); err != nil {
 			return fmt.Errorf("failed to ensure team members: %v", err)
 		}
 
 		expectedTeams = append(expectedTeams, team.Name)
 	}
 
-	org, err := client.GetOrganization(ctx, config.Organization)
+	org, err := client.GetOrganization(ctx, cfg.Organization)
 	if err != nil {
 		return err
 	}
@@ -118,7 +194,7 @@ func syncTeams(ctx context.Context, config *config.Config, client *quay.Client) 
 		if !util.StringSliceContains(expectedTeams, teamName) {
 			log.Printf("  - ⚑ %s", teamName)
 
-			if err := client.DeleteTeam(ctx, config.Organization, teamName); err != nil {
+			if err := client.DeleteTeam(ctx, cfg.Organization, teamName); err != nil {
 				return fmt.Errorf("failed to delete team: %v", err)
 			}
 		}
@@ -127,7 +203,7 @@ func syncTeams(ctx context.Context, config *config.Config, client *quay.Client) 
 	return nil
 }
 
-func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Client, team config.TeamConfig) error {
+func syncTeamMembers(ctx context.Context, cfg *config.Config, client *quay.Client, team config.TeamConfig) error {
 	var (
 		currentMembers []quay.TeamMember
 		err            error
@@ -139,7 +215,7 @@ func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Cl
 			IncludePending: &yesPlease,
 		}
 
-		currentMembers, err = client.GetTeamMembers(ctx, config.Organization, team.Name, getTeamOptions)
+		currentMembers, err = client.GetTeamMembers(ctx, cfg.Organization, team.Name, getTeamOptions)
 		if err != nil {
 			return fmt.Errorf("failed to list team members: %v", err)
 		}
@@ -153,7 +229,7 @@ func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Cl
 		if !util.StringSliceContains(team.Members, member.Name) {
 			log.Printf("    - ♟ %s", member.Name)
 
-			if err := client.RemoveUserFromTeam(ctx, config.Organization, team.Name, member.Name); err != nil {
+			if err := client.RemoveUserFromTeam(ctx, cfg.Organization, team.Name, member.Name); err != nil {
 				return fmt.Errorf("failed to remove member: %v", err)
 			}
 		}
@@ -163,7 +239,7 @@ func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Cl
 		if !util.StringSliceContains(currentMemberNames, member) {
 			log.Printf("    + ♟ %s", member)
 
-			if err := client.AddUserToTeam(ctx, config.Organization, team.Name, member); err != nil {
+			if err := client.AddUserToTeam(ctx, cfg.Organization, team.Name, member); err != nil {
 				return fmt.Errorf("failed to add member: %v", err)
 			}
 		}
@@ -172,11 +248,11 @@ func syncTeamMembers(ctx context.Context, config *config.Config, client *quay.Cl
 	return nil
 }
 
-func syncRepositories(ctx context.Context, config *config.Config, client *quay.Client, options Options) error {
+func syncRepositories(ctx context.Context, cfg *config.Config, client *quay.Client, options Options) error {
 	log.Println("⇄ Syncing repositories…")
 
 	requestOptions := quay.GetRepositoriesOptions{
-		Namespace: config.Organization,
+		Namespace: cfg.Organization,
 	}
 
 	currentRepos, err := client.GetRepositories(ctx, requestOptions)
@@ -187,7 +263,7 @@ func syncRepositories(ctx context.Context, config *config.Config, client *quay.C
 	// update/delete existing repos
 	currentRepoNames := []string{}
 	for _, repo := range currentRepos {
-		repoConfig := config.GetRepositoryConfig(repo.Name)
+		repoConfig := cfg.GetRepositoryConfig(repo.Name)
 		if repoConfig == nil {
 			if options.DeleteDanglingRepositories {
 				log.Printf("  - ⚒ %s", repo.Name)
@@ -209,7 +285,7 @@ func syncRepositories(ctx context.Context, config *config.Config, client *quay.C
 
 	// create missing repos on quay.io
 	if options.CreateMissingRepositories {
-		for _, repoConfig := range config.Repositories {
+		for _, repoConfig := range cfg.Repositories {
 			// ignore wildcard rules
 			if repoConfig.IsWildcard() {
 				continue
@@ -219,7 +295,7 @@ func syncRepositories(ctx context.Context, config *config.Config, client *quay.C
 				log.Printf("  + ⚒ %s", repoConfig.Name)
 
 				options := quay.CreateRepositoryOptions{
-					Namespace:   config.Organization,
+					Namespace:   cfg.Organization,
 					Repository:  repoConfig.Name,
 					Description: repoConfig.Description,
 					Visibility:  repoConfig.Visibility,
@@ -232,7 +308,7 @@ func syncRepositories(ctx context.Context, config *config.Config, client *quay.C
 				// doing it like this instead of GETing the repo after creation makes it
 				// safe for running in dry mode
 				repo := quay.Repository{
-					Namespace:   config.Organization,
+					Namespace:   cfg.Organization,
 					Name:        repoConfig.Name,
 					IsPublic:    repoConfig.Visibility == quay.Public,
 					Description: repoConfig.Description,

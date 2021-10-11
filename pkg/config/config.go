@@ -44,6 +44,33 @@ func (c *RepositoryConfig) IsWildcard() bool {
 type RobotConfig struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description,omitempty"`
+
+	// VaultSecret is the path inside the Vault API to the
+	// secret where the token should be stored, for example
+	// "mykvstore/data/customer-xyz" (note the "/data/" bit).
+	// Aquayman will extend the secret with a
+	// "quay.io-<orgname>-token" key and store the token there.
+	// If this is empty, no Vault interaction happens, even
+	// if -enable-vault is set.
+	// The value can include an optional key name to override
+	// the default. Use a "#" to separate path from key, e.g.
+	// "mykvstore/data/customer-xyz#keyname".
+	VaultSecret string `yaml:"vaultSecret,omitempty"`
+
+	// Deleted can be used as a workaround for deleting tokens
+	// from Vault. If a robot was just removed from the config.yaml
+	// alltogether, Aquayman would have no idea where to find the
+	// secret in Vault in order to delete it (because the path in
+	// Vault is not just constructed based on the robot name, but
+	// based on the VaultSecret property).
+	// If a clean cleanup is desired, one can first set this field
+	// to `true` and run Aquayman, which will remove the robot
+	// from quay and also remove the token from Vault. Afterwards,
+	// the robot can be removed entirely from the configuration.
+	// If a robot is directly removed from the configuration,
+	// an orphaned (yet invalid) token will remain in Vault. Not
+	// nice, but not the end of the world.
+	Deleted bool `yaml:"deleted,omitempty"`
 }
 
 func LoadFromFile(filename string) (*Config, error) {

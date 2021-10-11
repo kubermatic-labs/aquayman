@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubermatic-labs/aquayman/pkg/config"
 	"github.com/kubermatic-labs/aquayman/pkg/export"
+	"github.com/kubermatic-labs/aquayman/pkg/publisher"
 	"github.com/kubermatic-labs/aquayman/pkg/quay"
 	"github.com/kubermatic-labs/aquayman/pkg/sync"
 )
@@ -32,6 +33,11 @@ func main() {
 		exportMode         = false
 		createRepositories = false
 		deleteRepositories = false
+
+		// Set this to enable vault integration; as the Vault API
+		// client uses VAULT_ADDR and VAULT_TOKEN env vars already,
+		// we simply do the same.
+		enableVault = false
 	)
 
 	flag.StringVar(&configFile, "config", configFile, "path to the config.yaml")
@@ -42,11 +48,18 @@ func main() {
 	flag.BoolVar(&exportMode, "export", exportMode, "export quay.io state and update the config file (-config flag)")
 	flag.BoolVar(&createRepositories, "create-repos", createRepositories, "create repositories listed in the config file but not existing on quay.io yet")
 	flag.BoolVar(&deleteRepositories, "delete-repos", deleteRepositories, "delete repositories on quay.io that are not listed in the config file")
+	flag.BoolVar(&enableVault, "enable-vault", enableVault, "enable Vault integration (VAULT_ADDR and VAULT_TOKEN env vars must be set also)")
 	flag.Parse()
 
 	if showVersion {
 		fmt.Printf("Aquayman %s (built at %s)\n", version, date)
 		return
+	}
+
+	if enableVault {
+		if os.Getenv("VAULT_ADDR") == "" || os.Getenv("VAULT_TOKEN") == "" {
+			log.Fatal("⚠ Both VAULT_ADDR and VAULT_TOKEN environment variables need to be set if -enable-vault is used.")
+		}
 	}
 
 	if configFile == "" {
@@ -107,11 +120,20 @@ func main() {
 		return
 	}
 
+	var pub publisher.Publisher
+	if enableVault {
+		pub, err = publisher.NewVaultPublisher(cfg.Organization)
+		if err != nil {
+			log.Fatalf("⚠ Failed to create Vault client: %v.", err)
+		}
+	}
+
 	log.Printf("► Updating organization %s…", cfg.Organization)
 
 	options := sync.Options{
 		CreateMissingRepositories:  createRepositories,
 		DeleteDanglingRepositories: deleteRepositories,
+		Publisher:                  pub,
 	}
 
 	err = sync.Sync(ctx, cfg, client, options)
