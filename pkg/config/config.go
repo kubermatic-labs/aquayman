@@ -49,12 +49,14 @@ type RobotConfig struct {
 	// secret where the token should be stored, for example
 	// "mykvstore/data/customer-xyz" (note the "/data/" bit).
 	// Aquayman will extend the secret with a
-	// "quay.io-<orgname>-token" key and store the token there.
+	// "quay.io-<orgname>-token" and a "quay.io-<orgname>-secret" keys
+	// and store the token / a full docker config JSON there.
 	// If this is empty, no Vault interaction happens, even
 	// if -enable-vault is set.
 	// The value can include an optional key name to override
 	// the default. Use a "#" to separate path from key, e.g.
-	// "mykvstore/data/customer-xyz#keyname".
+	// "mykvstore/data/customer-xyz#keyname". Aquayman will still
+	// append "-token" and "-secret" to the custom keyname.
 	VaultSecret string `yaml:"vaultSecret,omitempty"`
 
 	// Deleted can be used as a workaround for deleting tokens

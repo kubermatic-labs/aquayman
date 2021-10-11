@@ -1,7 +1,10 @@
 package publisher
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -44,6 +47,12 @@ func (v *Vault) UpdateRobot(ctx context.Context, robot *config.RobotConfig, toke
 		return fmt.Errorf("failed to read from Vault: %w", err)
 	}
 
+	// precalculate a nice to use docker pull config JSON file
+	configJson, err := v.getDockerConfig(robot, token)
+	if err != nil {
+		return fmt.Errorf("failed to create Docker config: %w", err)
+	}
+
 	secretUpToDate := false
 	existingData := map[string]interface{}{}
 
@@ -55,9 +64,17 @@ func (v *Vault) UpdateRobot(ctx context.Context, robot *config.RobotConfig, toke
 			if m, ok := data.(map[string]interface{}); ok {
 				existingData = m
 
-				if value, exists := m[addr.key]; exists {
+				if value, exists := m[addr.key+"-token"]; exists {
 					if svalue, ok := value.(string); ok {
 						secretUpToDate = svalue == token
+					}
+				}
+
+				if secretUpToDate {
+					if value, exists := m[addr.key+"-config"]; exists {
+						if svalue, ok := value.(string); ok {
+							secretUpToDate = svalue == configJson
+						}
 					}
 				}
 			}
@@ -65,7 +82,9 @@ func (v *Vault) UpdateRobot(ctx context.Context, robot *config.RobotConfig, toke
 	}
 
 	if !secretUpToDate {
-		existingData[addr.key] = token
+		existingData[addr.key+"-token"] = token
+		existingData[addr.key+"-config"] = configJson
+
 		secret.Data["data"] = existingData
 
 		if _, err := v.client.Logical().Write(addr.path, secret.Data); err != nil {
@@ -74,6 +93,39 @@ func (v *Vault) UpdateRobot(ctx context.Context, robot *config.RobotConfig, toke
 	}
 
 	return nil
+}
+
+type dockerConfig struct {
+	Auths map[string]dockerAuth `json:"auths"`
+}
+
+type dockerAuth struct {
+	Auth  string `json:"auth"`
+	Email string `json:"email"`
+}
+
+func (v *Vault) getDockerConfig(robot *config.RobotConfig, token string) (string, error) {
+	auth := fmt.Sprintf("%s+%s:%s", v.org, robot.Name, token)
+	encoded := base64.StdEncoding.EncodeToString([]byte(auth))
+
+	cfg := dockerConfig{
+		Auths: map[string]dockerAuth{
+			"quay.io": {
+				Auth: encoded,
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+
+	encoder := json.NewEncoder(&buf)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(cfg); err != nil {
+		return "", fmt.Errorf("failed to encode docker config as JSON: %w", err)
+	}
+
+	return buf.String(), nil
 }
 
 func (v *Vault) DeleteRobot(ctx context.Context, robot *config.RobotConfig) error {
@@ -102,7 +154,8 @@ func (v *Vault) DeleteRobot(ctx context.Context, robot *config.RobotConfig) erro
 	if data, exists := secret.Data["data"]; exists {
 		if m, ok := data.(map[string]interface{}); ok {
 			if _, exists := m[addr.key]; exists {
-				delete(m, addr.key)
+				delete(m, addr.key+"-token")
+				delete(m, addr.key+"-config")
 
 				secret.Data["data"] = m
 
@@ -129,7 +182,7 @@ func (v *Vault) getAddress(robot *config.RobotConfig) (*address, error) {
 
 	a := address{
 		path: parts[0],
-		key:  fmt.Sprintf("quay.io-%s-%s-token", v.org, robot.Name),
+		key:  fmt.Sprintf("quay.io-%s-%s", v.org, robot.Name),
 	}
 
 	if len(parts) > 1 {
