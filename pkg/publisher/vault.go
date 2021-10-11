@@ -82,6 +82,12 @@ func (v *Vault) UpdateRobot(ctx context.Context, robot *config.RobotConfig, toke
 	}
 
 	if !secretUpToDate {
+		if secret == nil {
+			secret = &api.Secret{
+				Data: map[string]interface{}{},
+			}
+		}
+
 		existingData[addr.key+"-token"] = token
 		existingData[addr.key+"-config"] = configJson
 
