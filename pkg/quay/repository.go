@@ -45,6 +45,7 @@ func (r *Repository) Visibility() RepositoryVisibility {
 
 type getRepositoriesReponse struct {
 	Repositories []Repository `json:"repositories"`
+	NextPage     string       `json:"next_page"`
 }
 
 type GetRepositoriesOptions struct {
@@ -69,6 +70,22 @@ func (o *GetRepositoriesOptions) Apply(v url.Values) url.Values {
 	return v
 }
 
+type internalGetRepositoriesOptions struct {
+	GetRepositoriesOptions
+
+	NextPage string
+}
+
+func (o *internalGetRepositoriesOptions) Apply(v url.Values) url.Values {
+	o.GetRepositoriesOptions.Apply(v)
+
+	if o.NextPage != "" {
+		v.Set("next_page", o.NextPage)
+	}
+
+	return v
+}
+
 type RepoByName []Repository
 
 func (a RepoByName) Len() int           { return len(a) }
@@ -76,13 +93,31 @@ func (a RepoByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a RepoByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 func (c *Client) GetRepositories(ctx context.Context, options GetRepositoriesOptions) ([]Repository, error) {
-	response := getRepositoriesReponse{}
-	err := c.call(ctx, "GET", "/repository", &options, nil, &response)
+	opt := &internalGetRepositoriesOptions{
+		GetRepositoriesOptions: options,
+	}
 
-	repositories := response.Repositories
-	sort.Sort(RepoByName(repositories))
+	result := []Repository{}
 
-	return repositories, err
+	for {
+		response := getRepositoriesReponse{}
+		err := c.call(ctx, "GET", "/repository", opt, nil, &response)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, response.Repositories...)
+
+		if response.NextPage == "" {
+			break
+		}
+
+		opt.NextPage = response.NextPage
+	}
+
+	sort.Sort(RepoByName(result))
+
+	return result, nil
 }
 
 type CreateRepositoryOptions struct {
