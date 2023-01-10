@@ -131,7 +131,7 @@ func validRepositoryRole(role quay.RepositoryRole) bool {
 var (
 	userRegexp  = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]*$`)
 	teamRegexp  = regexp.MustCompile(`^[a-z][a-z0-9]+$`)
-	repoRegexp  = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]*$`)
+	repoRegexp  = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]*(/[a-z0-9][.a-z0-9_-]*)*$`)
 	robotRegexp = regexp.MustCompile(`^[a-z][a-z0-9_]{1,254}$`)
 	orgRegexp   = regexp.MustCompile(`^[a-z0-9][.a-z0-9_-]{1,254}$`)
 )
