@@ -14,14 +14,14 @@ organization. This enables consistent, always up-to-date team members and access
 
 We strongly recommend that you use an [official release][3] of Aquayman.
 
-_The code and sample YAML files in the master branch of are under active development and are not guaranteed to be stable. Use them at your own risk!_
+_The code and sample YAML files in the main branch of are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## Build From Source
 
-This project uses Go 1.14 and Go modules for its dependencies. You can get it via `go get`:
+You can install/compile it directly if you have Go 1.20+ installed on your system:
 
 ```bash
-GO111MODULE=on go get github.com/kubermatic-labs/aquayman
+go install github.com/kubermatic-labs/aquayman
 ```
 
 ## Mode Of Operation
@@ -167,7 +167,6 @@ Feedback and discussion are available on [the mailing list][11].
 
 * Please familiarize yourself with the [Code of Conduct][4] before contributing.
 * See [CONTRIBUTING.md][2] for instructions on the developer certificate of origin that we require.
-* Read how [we're using ZenHub][13] for project and roadmap planning
 
 ### Pull requests
 
@@ -178,11 +177,10 @@ Feedback and discussion are available on [the mailing list][11].
 See [the list of releases][3] to find out about feature changes.
 
 [1]: https://github.com/kubermatic-labs/aquayman/issues
-[2]: https://github.com/kubermatic-labs/aquayman/blob/master/CONTRIBUTING.md
+[2]: https://github.com/kubermatic-labs/aquayman/blob/main/CONTRIBUTING.md
 [3]: https://github.com/kubermatic-labs/aquayman/releases
-[4]: https://github.com/kubermatic-labs/aquayman/blob/master/CODE_OF_CONDUCT.md
+[4]: https://github.com/kubermatic-labs/aquayman/blob/main/CODE_OF_CONDUCT.md
 
 [11]: https://groups.google.com/forum/#!forum/kubermatic-dev
 [12]: https://kubermatic.slack.com/messages/kubermatic-labs
-[13]: https://github.com/kubermatic-labs/aquayman/blob/master/Zenhub.md
 [15]: http://slack.kubermatic.io/
